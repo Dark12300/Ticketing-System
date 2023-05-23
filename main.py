@@ -77,8 +77,10 @@ class TicketingSystem():
 
         #user portal variables
         self.current_user = ""
+        self.current_user_privilege = None   #0: non-admin, 1: admin
         self.default_username = "admin123"
         self.default_password = "password123"
+        self.default_user_privilege = 1
 
         self.power_off = False
         self.login_attempts = 0
@@ -92,6 +94,7 @@ class TicketingSystem():
             "tickets": ["-l", "--list"],
             "clear": [],
             "passwd": [],
+            "users": ["-l", "--list", "-a", "--add", "-d", "--delete", "-u", "--update"]
             }   #command, args
         self.command_help = {
             "shutdown": ["Shutdown the system."], 
@@ -108,6 +111,12 @@ class TicketingSystem():
                 ], 
             "clear": ["Clears the screen."],
             "passwd": ["Change the password for the current user."],
+            "users": [
+                "-l, --list  List the users registered on the system.",
+                "-a, --add  Add a user to the system.",
+                "-d, --delete  Delete a user from the system.",
+                "-u, --update  Update the current user's username.",
+                ]
             }
 
         dtype("Launching program...")
@@ -148,8 +157,8 @@ class TicketingSystem():
 
                 salt = bcrypt.gensalt().decode("utf-8")
                 password_hash = hashlib.sha256(f'{self.default_password}{salt}'.encode('utf-8')).hexdigest()
-                self.database_cursor.execute("INSERT INTO users (username, password, salt) VALUES (?, ?, ?);", 
-                                             (self.default_username, password_hash, salt))
+                self.database_cursor.execute("INSERT INTO users (username, password, salt, admin_privileges) VALUES (?, ?, ?, ?);", 
+                                             (self.default_username, password_hash, salt, self.default_user_privilege))
                 self.database_cursor.executemany("INSERT INTO prices VALUES (?, ?);", 
                                                  [(item, price) for item, price in self.entrance_prices.items()])
 
@@ -208,6 +217,16 @@ class TicketingSystem():
                                       self.total_cost, self.date_ordered_unix))
         self.database_connection.commit()
 
+    def return_user_row(self, username: str) -> tuple:
+        """Return the user row from the database."""
+        self.database_cursor.execute("SELECT * FROM users WHERE username = ?;", (username,))
+        return self.database_cursor.fetchone()
+    
+    def return_users(self) -> list:
+        """Return all users registered on the system."""
+        self.database_cursor.execute("SELECT id, username FROM users;")
+        return self.database_cursor.fetchall()
+
     def login(self) -> bool:
         """Verify a user with a username and password."""
         if self.login_attempts >= 5:
@@ -225,8 +244,7 @@ class TicketingSystem():
         username = input("Enter username: ")
         password = getpass.getpass(prompt="Enter password: ")
         
-        self.database_cursor.execute("SELECT * FROM users WHERE username = ?;", (username,))
-        user_row = self.database_cursor.fetchone()
+        user_row = self.return_user_row(username)
         if not user_row:   #user doesn't exist
             self.login_attempts += 1
             self.last_login_attempt = time.time()
@@ -249,6 +267,7 @@ class TicketingSystem():
         
         self.login_attempts = 0
         self.current_user = username
+        self.current_user_privilege = user_row[4]
         return True
     
     def user_portal(self) -> None:
@@ -296,7 +315,7 @@ class TicketingSystem():
                     print()
 
                 elif "-u" in arguments or "--update" in arguments:
-                    if self.current_user != self.default_username:   #default username is the admin
+                    if self.current_user_privilege != 1:
                         print("Permission denied.")
                         print()
                         continue
@@ -350,8 +369,7 @@ class TicketingSystem():
             elif main_command == "passwd":
                 password = getpass.getpass(prompt="Enter current password: ")
 
-                self.database_cursor.execute("SELECT * FROM users WHERE username = ?;", (self.current_user,))
-                user_row = self.database_cursor.fetchone()
+                user_row = self.return_user_row(self.current_user)
                 user_id = user_row[0]
 
                 user_password = user_row[2]
@@ -370,6 +388,98 @@ class TicketingSystem():
                 self.database_connection.commit()
                 print("Password updated.")
                 print()
+
+            elif main_command == "users":
+                if "-l" in arguments or "--list" in arguments:
+                    users = self.return_users()
+                    for user in users:
+                        print(f"{user[0]}: {user[1]}")
+                    print()
+
+                elif "-a" in arguments or "--add" in arguments:
+                    if self.current_user_privilege != 1:
+                        print("Permission denied.")
+                        print()
+                        continue
+
+                    new_username = input("Enter the new username: ")
+                    new_password = getpass.getpass(prompt="Enter the new password: ")
+                    new_user_privileges = input_validate("Is the new user an admin?", "bool", slow_type=False)
+                    print()
+                    if not new_username or not new_password:   #empty username or password
+                        print("Invalid new username or password.")
+                        print()
+                        continue
+
+                    current_users = self.return_users()
+                    if any([new_username == user[1] for user in current_users]):   #username already exists
+                        print("Username already exists.")
+                        print()
+                        continue
+
+                    new_salt = bcrypt.gensalt().decode("utf-8")
+                    password_hash = hashlib.sha256(f"{new_password}{new_salt}".encode("utf-8")).hexdigest()
+
+                    self.database_cursor.execute("INSERT INTO users (username, password, salt, admin_privileges) VALUES (?, ?, ?, ?);", 
+                                                 (new_username, password_hash, new_salt, new_user_privileges))
+                    self.database_connection.commit()
+                    print("User added.")
+                    print()
+
+                elif "-d" in arguments or "--delete" in arguments:
+                    if self.current_user_privilege != 1:
+                        print("Permission denied.")
+                        print()
+                        continue
+
+                    username = input("Enter the username: ")
+                    print()
+                    if username == self.current_user:
+                        print("Unable to delete current user.")
+                        print()
+                        continue
+
+                    current_users = self.return_users()
+                    if not any([username == user[1] for user in current_users]) or not username:   #username doesn't exist
+                        print("Username does not exist.")
+                        print()
+                        continue
+
+                    user_row = self.return_user_row(username)
+                    if user_row[4] == 1:
+                        print("Unable to delete admin account.")
+                        print()
+                        continue
+
+                    self.database_cursor.execute("DELETE FROM users WHERE id = ?;", (user_row[0],))
+                    self.database_connection.commit()
+
+                    print("User deleted.")
+                    print()
+
+                elif "-u" in arguments or "--update" in arguments:
+                    new_username = input("Enter the new username: ")
+                    print()
+                    current_users = self.return_users()
+
+                    if not new_username:
+                        print("Invalid new username.")
+                        print()
+                        continue
+
+                    if any([new_username == user[1] for user in current_users]):   #username already exists
+                        print("Username already exists.")
+                        print()
+                        continue
+
+                    user_row = self.return_user_row(self.current_user)
+                    self.database_cursor.execute("UPDATE users SET username = ? WHERE id = ?;", (new_username, user_row[0]))
+                    self.database_connection.commit()
+
+                    self.current_user = new_username
+
+                    print("Username updated.")
+                    print()
 
     def ticket_program(self):
         """The main ticket program where customers can buy tickets."""
@@ -473,7 +583,7 @@ class TicketingSystem():
             time.sleep(0.5)
 
             print()
-            dtype("Thanks you for booking at Copington Adventure Theme Park!")
+            dtype("Thank you for booking at Copington Adventure Theme Park!")
             print()
 
             self.customers += self.adult_tickets + self.child_tickets + self.senior_tickets   #update customer count
