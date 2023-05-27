@@ -63,16 +63,14 @@ class MainDatabase():
             time.sleep(0.5)
             exit()
 
-    def add_ticket(self, adult_tickets: int, child_tickets: int, 
-                   senior_tickets: int, wristbands: int, surname: str,
-                   parking_pass_required: bool, total_cost: float, date_ordered: int) -> None:
+    def add_ticket(self, values: dict) -> None:
         """Add a ticket to the database."""
         self.database_cursor.execute("INSERT INTO tickets (adult_tickets, child_tickets"
                                      + ", senior_tickets, wristbands, surname, parking_pass_required"
                                      + ", total_cost, date_ordered) VALUES (?, ?, ?, ?, ?, ?, ?, ?);", 
-                                     (adult_tickets, child_tickets, senior_tickets, 
-                                      wristbands, surname, parking_pass_required, 
-                                      total_cost, date_ordered))
+                                     (values['adult_tickets'], values['child_tickets'], values['senior_tickets'], 
+                                      values['wristbands'], values['surname'], values['parking_pass_required'], 
+                                      values['total_cost'], values['date_ordered']))
         
         self.database_connection.commit()
 

@@ -37,7 +37,7 @@ def input_validate(text: str, data_type: str, round_value: bool = False, slow_ty
             value = round(float(value), 2) if round_value else float(value)
             break
 
-        elif data_type == "bool" and value in ["yes", "y", "no", "n"]:
+        elif data_type == "bool" and value.lower() in ["yes", "y", "no", "n"]:
             value = True if value.lower() in ["yes", "y"] else False
             break
 
@@ -66,7 +66,7 @@ def display_prices(entrance_prices: dict, slow_type: bool = True) -> None:
         price_formatted = f"£{price:.2f}"
         print_method(f"{item.replace('_', ' ').title():<{left_align}} : {price_formatted:>{right_align}}")
 
-def display_ticket(*args, slow_type: bool = True) -> None:
+def display_ticket(values: dict, slow_type: bool = True) -> None:
         """Displays a ticket based on values from the arguments."""
         if slow_type:
             print_method = dtype
@@ -74,12 +74,13 @@ def display_ticket(*args, slow_type: bool = True) -> None:
             print_method = print
 
         left_align = 14
-        date_ordered = datetime.utcfromtimestamp(args[7]).strftime("%H:%M:%S GMT %d/%m/%Y") if isinstance(args[7], int) else args[7]
-        print_method(f"{'Adult tickets':<{left_align}} : {args[0]}")
-        print_method(f"{'Child tickets':<{left_align}} : {args[1]}")
-        print_method(f"{'Senior tickets':<{left_align}} : {args[2]}")
-        print_method(f"{'Wristbands':<{left_align}} : {args[3]}")
-        print_method(f"{'Surname':<{left_align}} : {args[4]}")
-        print_method(f"{'Parking pass':<{left_align}} : {'Yes' if args[5] else 'No'}")
-        print_method(f"{'Total cost':<{left_align}} : £{args[6]:.2f}")
+        date = values["date_ordered"]
+        date_ordered = datetime.utcfromtimestamp(date).strftime("%H:%M:%S GMT %d/%m/%Y") if isinstance(date, int) else date
+        print_method(f"{'Adult tickets':<{left_align}} : {values['adult_tickets']}")
+        print_method(f"{'Child tickets':<{left_align}} : {values['child_tickets']}")
+        print_method(f"{'Senior tickets':<{left_align}} : {values['senior_tickets']}")
+        print_method(f"{'Wristbands':<{left_align}} : {values['wristbands']}")
+        print_method(f"{'Surname':<{left_align}} : {values['surname']}")
+        print_method(f"{'Parking pass':<{left_align}} : {'Yes' if values['parking_pass_required'] else 'No'}")
+        print_method(f"{'Total cost':<{left_align}} : £{values['total_cost']:.2f}")
         print_method(f"{'Date ordered':<{left_align}} : {date_ordered}")

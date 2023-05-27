@@ -184,11 +184,21 @@ class UserPortal():
                     entries = input_validate(f"How many database entries would you like to list [total {total_rows}]:", "integer", slow_type = False)
 
                     rows = self.main_database.return_tickets(entries)
-                    
                     print()
                     for row in rows:
+                        values = {
+                            "adult_tickets": row[1],
+                            "child_tickets": row[2],
+                            "senior_tickets": row[3],
+                            "wristbands": row[4],
+                            "surname": row[5],
+                            "parking_pass_required": row[6],
+                            "total_cost": row[7],
+                            "date_ordered": row[8],
+                            }
+
                         print(f"---------- Ticket {row[0]} ----------")
-                        display_ticket(*row[1:], slow_type=False)
+                        display_ticket(values, slow_type=False)
                         print()
 
             elif main_command == "clear":
