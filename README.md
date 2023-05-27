@@ -5,6 +5,10 @@ This program was made as a school project for GCSE Computer Science.
 
 # CHANGELOG
 
+## 1.2
+
+* Added separate modules.
+
 ## 1.1
 
 * Added username update command.
